@@ -16,7 +16,7 @@ DB_USER = os.getenv('DB_USERNAME')
 DB_PW = os.getenv('DB_PASSWORD')
 intents = discord.Intents.default()
 intents.members = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!raib', intents=intents)
 sslcontext = ssl.create_default_context()
 sslcontext.check_hostname = False
 sslcontext.verify_mode = ssl.CERT_NONE
@@ -48,6 +48,28 @@ async def on_message(message):
 
     if message.content.startswith('!hello'):
         await message.channel.send("Hello")
+    elif message.content.startswith('berikan aku ruang'):
+        # Mengambil server (guild) tempat pesan tersebut diposting
+        guild = message.guild
+
+    # Membuat saluran teks baru dengan nama "ruang-<nama_pengguna>"
+        channel_name = f"ruang-{message.author.name}"
+        await guild.create_text_channel(channel_name)
+
+    # Mengirim pesan konfirmasi ke saluran teks yang asal
+        await guild.create_text_channel.send(f"Ruang teks baru '{channel_name}' telah dibuat untuk {message.author.mention}")
+    elif message.content.startswith('aku mau ngomong sesuatu ra'):
+        guild = message.guild
+
+    # Membuat kategori (category) untuk thread baru
+        category = await guild.create_category(f"Ruang-{message.author.name}")
+
+    # Membuat thread baru dalam kategori tersebut
+        thread = await category.create_text_channel(name="ruang-teks", reason="Membuat thread baru")
+
+    # Mengirim pesan ke dalam thread yang baru saja dibuat
+        await thread.send(f'kemari ali! {message.author.mention}')
+    # batas uji coba
     elif message.content.startswith('!HAI'):
         await message.channel.send(f'hai, {message.author.mention}')
     elif message.content.startswith('hai, ra!'):
@@ -75,7 +97,7 @@ async def on_message(message):
                 cmd, shell=True, text=True, check=True)
 
         # Send a success message
-            await message.channel.send("Database backup completed successfully.")
+            await message.channel.send(f"Sir {message.author.mention} \n Database backup completed successfully.")
 
         # Send the backup file to the same channel
             backup_file = discord.File(f"{path_file}")
