@@ -69,22 +69,54 @@ async def on_message(message):
         database_name = message.content.split(" ")[1]
         path_file = f"/Users/rafiizzatulrizqufaris/Documents/python_upi/{database_name}.sql"
         cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} {database_name} > {path_file}"
-    try:
-        # Run the backup command
-        result = subprocess.run(
-            cmd, shell=True, text=True, check=True)
+        try:
+            # Run the backup command
+            result = subprocess.run(
+                cmd, shell=True, text=True, check=True)
 
         # Send a success message
-        await message.channel.send("Database backup completed successfully.")
+            await message.channel.send("Database backup completed successfully.")
 
         # Send the backup file to the same channel
-        backup_file = discord.File(f"{path_file}")
-        await message.channel.send(file=backup_file)
-        os.remove(path_file)
+            backup_file = discord.File(f"{path_file}")
+            await message.channel.send(file=backup_file)
+            os.remove(path_file)
 
-    except subprocess.CalledProcessError as e:
-        # If the command returns a non-zero exit code, there was an error
-        await message.channel.send(f"Error during database backup:\n```{e.stderr}```")
+        except subprocess.CalledProcessError as e:
+            # If the command returns a non-zero exit code, there was an error
+            await message.channel.send(f"Error during database backup:\n```{e.stderr}```")
+    elif message.content.startswith('!run'):
+        # Split the message content into parts
+        parts = message.content.split(" ")
+
+    # Check if there are at least 3 parts (command, database name, and user query)
+        if len(parts) >= 3:
+            # Extract the database name and user query
+            database_name = parts[1]
+        # Join the remaining parts to form the user query
+            user_query = " ".join(parts[2:])
+
+        # Construct the MySQL command with proper quoting
+            cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e \"{user_query}\" {database_name}"
+
+        try:
+            # Run the query command
+            result = subprocess.run(
+                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if result.returncode == 0:
+                # Send the query result as a message
+                await message.channel.send(f"Query result for database '{database_name}':\n```{result.stdout}```")
+            else:
+                # If there's an error, send an error message
+                await message.channel.send(f"Error executing the query:\n```{cmd}```")
+
+        except Exception as e:
+            # Handle other exceptions gracefully
+            await message.channel.send(f"An error occurred: {e}")
+
+        # Print the executed command for debugging purposes
+        print(cmd)
 
 
 @bot.event
