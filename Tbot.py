@@ -2,11 +2,21 @@ import os
 import ssl
 import subprocess
 import re
+import youtube_dl
+import asyncio
 
 import discord
 import aiohttp
 from dotenv import load_dotenv
 from discord.ext import commands
+from urllib.request import build_opener
+
+import certifi
+import urllib3
+import urllib
+
+# Set the SSL certificate path
+urllib3.util.ssl_.DEFAULT_CERTS_FILE = certifi.where()
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -20,8 +30,20 @@ bot = commands.Bot(command_prefix='!raib', intents=intents)
 sslcontext = ssl.create_default_context()
 sslcontext.check_hostname = False
 sslcontext.verify_mode = ssl.CERT_NONE
+ssl._create_default_https_context = ssl._create_unverified_context
+ssl_context = ssl._create_unverified_context()
+opener = build_opener(urllib.request.HTTPSHandler(context=ssl_context))
+youtube_dl.utils.urlopen = opener.open
 connector = aiohttp.TCPConnector(ssl=sslcontext)
 client = discord.Client(connector=connector, intents=intents)
+
+
+urllib3.util.ssl_.DEFAULT_CERTS_FILE = certifi.where()
+
+# Disable SSL certificate verification
+sslcontext = ssl.create_default_context()
+sslcontext.check_hostname = False
+sslcontext.verify_mode = ssl.CERT_NONE
 
 
 @client.event
@@ -43,6 +65,7 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
+    global voice_clients
     if message.author == client.user:
         return
 
@@ -51,13 +74,19 @@ async def on_message(message):
     elif message.content.startswith('berikan aku ruang'):
         # Mengambil server (guild) tempat pesan tersebut diposting
         guild = message.guild
+        parts = message.content.split(" ")
+        if len(parts) >= 4:
+            namespace = " ".join(parts[3:])
 
     # Membuat saluran teks baru dengan nama "ruang-<nama_pengguna>"
-        channel_name = f"ruang-{message.author.name}"
-        await guild.create_text_channel(channel_name)
+        channel_name = f"ruang-{namespace}"
+        new_channel = await guild.create_text_channel(channel_name)
 
     # Mengirim pesan konfirmasi ke saluran teks yang asal
-        await guild.create_text_channel.send(f"Ruang teks baru '{channel_name}' telah dibuat untuk {message.author.mention}")
+        await new_channel.send(f"Ruang teks baru '{channel_name}' telah dibuat untuk {message.author.mention}")
+    #                               #
+    #INI MASIH DALAM TAHAP UJI COBA #
+    #                               #
     elif message.content.startswith('aku mau ngomong sesuatu ra'):
         guild = message.guild
 
@@ -74,6 +103,41 @@ async def on_message(message):
         await message.channel.send(f'hai, {message.author.mention}')
     elif message.content.startswith('hai, ra!'):
         await message.channel.send('hai, ali')
+
+    elif message.content.startswith('play'):
+        # Mendapatkan URL lagu dari pesan pengguna
+        url = message.content[len('play'):].strip()
+
+        if message.author.voice is None:
+            await message.channel.send("Anda harus bergabung dengan channel suara terlebih dahulu.")
+            return
+
+        voice_channel = message.author.voice.channel
+        voice_client = await voice_channel.connect()
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'verbose': True,  # check certficate
+        }
+
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            try:
+                info = ydl.extract_info(url, download=False)
+                url2 = info['formats'][0]['url']
+                voice_client.play(discord.FFmpegPCMAudio(url2))
+            except Exception as e:
+                print(f"An error occurred during music playback: {e}")
+
+        # Menunggu hingga lagu selesai sebelum keluar dari channel suara
+        await voice_client.is_playing()
+        # await asyncio.sleep(1)
+
+        # await voice_client.disconnect()
     elif message.content.startswith('!show_databases'):
         cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'show databases;'"
         try:
@@ -138,7 +202,7 @@ async def on_message(message):
             await message.channel.send(f"An error occurred: {e}")
 
         # Print the executed command for debugging purposes
-        print(cmd)
+        # print(cmd)
 
 
 @bot.event
