@@ -1,7 +1,5 @@
 # fix uploader id error
 # watch this bro, this unreal
-# feature musid
-# run adn proto
 
 import os
 import ssl
