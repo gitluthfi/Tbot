@@ -289,7 +289,7 @@ async def on_message(message):
             output = f"An error occurred: {e}"
 
         await message.channel.send(output)
-    elif message.content.startswith(f"{perintah}backup"):
+    elif message.content.startswith(f"{perintah} backup"):
         database_name = message.content.split(" ")[2]
         path_file = f"/Users/rafiizzatulrizqufaris/Documents/python_upi/{database_name}.sql"
         cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} {database_name} > {path_file}"
@@ -309,7 +309,7 @@ async def on_message(message):
         except subprocess.CalledProcessError as e:
             # If the command returns a non-zero exit code, there was an error
             await message.channel.send(f"Error during database backup:\n```{e.stderr}```")
-    elif message.content.startswith(f"{perintah}run"):
+    elif message.content.startswith(f"{perintah} run"):
         # Split the message content into parts
         parts = message.content.split(" ")
 
@@ -341,7 +341,7 @@ async def on_message(message):
 
         # Print the executed command for debugging purposes
         # print(cmd)
-    elif message.content.startswith(f"{perintah}proto"):
+    elif message.content.startswith(f"{perintah} proto"):
         # Split the message content into parts
         parts = message.content.split(" ")
 
