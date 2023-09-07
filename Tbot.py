@@ -1,5 +1,6 @@
 # fix uploader id error
 # watch this bro, this unreal
+# https://www.youtube.com/watch?v=Ghe058HpmMk&ab_channel=JaredThomas
 
 import os
 import ssl
@@ -11,9 +12,16 @@ import pandas as pd
 import io
 import discord
 import aiohttp
+import lyricsgenius
 from dotenv import load_dotenv
 from discord.ext import commands
 from urllib.request import build_opener
+from youtubesearchpython import VideosSearch
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 import certifi
 import urllib3
@@ -28,6 +36,9 @@ DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
 DB_USER = os.getenv('DB_USERNAME')
 DB_PW = os.getenv('DB_PASSWORD')
+FOLDER_ID = os.getenv("FOLDER_DRIVE")
+GENIUS_API = os.getenv('GENIUS_API_ID')
+genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -218,7 +229,15 @@ async def on_message(message):
     elif message.content.startswith(f"{perintah} play"):
         # Mendapatkan URL lagu dari pesan pengguna
         url = message.content[len(f"{perintah} play"):].strip()
+        #song_title = message.content[len(f"{perintah} play"):].strip()
+        videosSearch = VideosSearch(url, limit=1)
 
+        results = videosSearch.result()
+        if not results:
+            await message.channel.send("No matching videos found.")
+            return
+
+        video_url = results['result'][0]['link']
         if message.author.voice is None:
             await message.channel.send("Anda harus bergabung dengan channel suara terlebih dahulu.")
             return
@@ -244,27 +263,95 @@ async def on_message(message):
             'default_search': 'auto',
             # bind to ipv4 since ipv6 addresses cause issues sometimes
             'source_address': '0.0.0.0',
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
         }
-
         ffmpeg_options = {
             'options': '-vn -b:a 256k -af loudnorm',
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
         }
 
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             try:
-                info = ydl.extract_info(url, download=False)
+                info = ydl.extract_info(video_url, download=False)
                 url2 = info['formats'][0]['url']
+                print(url2)
+            # Extract the song title from video metadata
+                #song_title = info['title']
+                song_title = message.content[len(f"{perintah} play"):].strip()
+            # Fetch lyrics for the song title
+                try:
+                    song = genius.search_song(song_title)
+                    if song:
+                        lyrics = song.lyrics
+                        file_name = f"{song_title}_lyrics.txt"
+                        with open(file_name, "w", encoding="utf-8") as lyrics_file:
+                            lyrics_file.write(lyrics)
+                        with open(file_name, "rb") as lyrics_file:
+                            await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
+                        os.remove(file_name)
+                    else:
+                        await message.channel.send("Lyrics not found for this song.")
+                except Exception as e:
+                    await message.channel.send(f"An error occurred while fetching lyrics: {e}")
+
                 voice_client.play(discord.FFmpegPCMAudio(url2))
-                await message.channel.send('Lagu anda diputar, ENJOY!!!')
+                await message.channel.send(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
                 print("Playing music...")  # Add this line for debugging
 
                 while voice_client.is_playing():
                     await asyncio.sleep(1)
-
                 print("Finished playing.")  # Add this line for debugging
-                await voice_client.disconnect()
             except Exception as e:
                 print(f"An error occurred during music playback: {e}")
+            finally:
+                await voice_client.disconnect()
+    # elif message.content.startswith(f"{perintah} pause"):
+    #     voice_channel = message.author.voice.channel
+    #     if voice_chan and voice_chan.is_playing():
+    #         voice_chan.pause()
+    #         await message.channel.send('Music paused')
+    #     else:
+    #         await message.channel.send('Tidak ada lagu yang diputar')
+    # elif message.content.startswith(f"{perintah} resume"):
+    #     voice_channel = message.author.voice.channel
+    #     if voice_chan and voice_chan.is_paused():
+    #         voice_chan.resume()
+    #         await message.channel.send('Lagu kembali diputar')
+    #     else:
+    #         await message.channel.send('Tidak ada lagu yang diputar')
+    # elif message.content.startswith(f"{perintah} stop"):
+    #     voice_channel = message.author.voice.channel
+    #     if voice_chan and voice_chan.is_playing() or voice_chan.is_paused():
+    #         voice_chan.stop()
+    #         await message.channel.send(f"Lagu dihentikan")
+    #     else:
+    #         await message.channel.send(f"Tidak ada lagu yang diputar")
+
+    elif message.content.startswith(f"{perintah} lirik lagu"):
+        # Get the song title from the user's message
+        song_title = message.content[len(f"{perintah} getlyrics"):].strip()
+
+        try:
+            song = genius.search_song(song_title)
+            if song:
+                lyrics = song.lyrics
+
+            # Create a text file to store the lyrics
+                file_name = f"{song_title}_lyrics.txt"
+                with open(file_name, "w", encoding="utf-8") as lyrics_file:
+                    lyrics_file.write(lyrics)
+
+            # Send the text file as an attachment
+                with open(file_name, "rb") as lyrics_file:
+                    await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
+
+            # Delete the text file after sending it (optional)
+                os.remove(file_name)
+            else:
+                await message.channel.send("Lyrics not found for this song.")
+        except Exception as e:
+            await message.channel.send(f"An error occurred while fetching lyrics: {e}")
+
     elif message.content.startswith(f"{perintah} show_databases"):
         cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'select DB_ILY.m_staging.database_name, DB_ILY.m_staging.project_name from DB_ILY.m_staging;'"
         # parts = message.content.split(" ")
@@ -298,8 +385,22 @@ async def on_message(message):
             result = subprocess.run(
                 cmd, shell=True, text=True, check=True)
 
+        # Authenticate with Google Drive using the JSON key file
+            gauth = GoogleAuth()
+            gauth.LoadClientConfigFile('client_secret.json')  # <-----
+            # This creates a local webserver and automatically handles authentication.
+            gauth.LocalWebserverAuth()
+
+        # Create a GoogleDrive client
+            drive = GoogleDrive(gauth)
+
+            destination_folder_id = FOLDER_ID
+            file = drive.CreateFile({'title': f'{database_name}.sql', 'parents': [
+                                    {'id': destination_folder_id}]})
+            file.Upload()
+            file_link = file['alternateLink']
         # Send a success message
-            await message.channel.send(f"Sir {message.author.mention} \n Database backup completed successfully.")
+            await message.channel.send(f"Sir {message.author.mention} \n Database backup completed successfully. /n Here {file_link}")
 
         # Send the backup file to the same channel
             backup_file = discord.File(f"{path_file}")
