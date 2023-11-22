@@ -36,6 +36,8 @@ DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
 DB_USER = os.getenv('DB_USERNAME')
 DB_PW = os.getenv('DB_PASSWORD')
+PATH_FILE= os.getenv('PATH_FILE')
+
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
 genius = lyricsgenius.Genius(GENIUS_API)
@@ -82,112 +84,112 @@ async def on_ready():
             if general_channel.permissions_for(guild.me).send_messages:
                 await general_channel.send("@everyone ILY ready to serve!")
 
-youtube_dl.utils.bug_reports_message = lambda: ''
+# youtube_dl.utils.bug_reports_message = lambda: ''
 
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    # bind to ipv4 since ipv6 addresses cause issues sometimes
-    'source_address': '0.0.0.0'
-}
+# ytdl_format_options = {
+#     'format': 'bestaudio/best',
+#     'restrictfilenames': True,
+#     'noplaylist': True,
+#     'nocheckcertificate': True,
+#     'ignoreerrors': False,
+#     'logtostderr': False,
+#     'quiet': True,
+#     'no_warnings': True,
+#     'default_search': 'auto',
+#     # bind to ipv4 since ipv6 addresses cause issues sometimes
+#     'source_address': '0.0.0.0'
+# }
 
-ffmpeg_options = {
-    'options': '-vn'
-}
+# ffmpeg_options = {
+#     'options': '-vn'
+# }
 
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
-
-
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get('title')
-        self.url = ""
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]
-        filename = data['title'] if stream else ytdl.prepare_filename(data)
-        return filename
+# ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 
-@bot.command(name='join', help='Tells the bot to join the voice channel')
-async def join(ctx):
-    if not ctx.message.author.voice:
-        await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
-        return
-    else:
-        channel = ctx.message.author.voice.channel
-    await channel.connect()
+# class YTDLSource(discord.PCMVolumeTransformer):
+#     def __init__(self, source, *, data, volume=0.5):
+#         super().__init__(source, volume)
+#         self.data = data
+#         self.title = data.get('title')
+#         self.url = ""
+
+#     @classmethod
+#     async def from_url(cls, url, *, loop=None, stream=False):
+#         loop = loop or asyncio.get_event_loop()
+#         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+#         if 'entries' in data:
+#             # take first item from a playlist
+#             data = data['entries'][0]
+#         filename = data['title'] if stream else ytdl.prepare_filename(data)
+#         return filename
 
 
-@bot.command(name='leave', help='To make the bot leave the voice channel')
-async def leave(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_connected():
-        await voice_client.disconnect()
-    else:
-        await ctx.send("The bot is not connected to a voice channel.")
+# @bot.command(name='join', help='Tells the bot to join the voice channel')
+# async def join(ctx):
+#     if not ctx.message.author.voice:
+#         await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
+#         return
+#     else:
+#         channel = ctx.message.author.voice.channel
+#     await channel.connect()
 
 
-@bot.command(name='play_song', help='To play song')
-async def play(ctx, url):
-    try:
-        server = ctx.message.guild
-        voice_channel = server.voice_client
-
-        async with ctx.typing():
-            filename = await YTDLSource.from_url(url, loop=bot.loop)
-            voice_channel.play(discord.FFmpegPCMAudio(
-                executable="ffmpeg.exe", source=filename))
-        await ctx.send('**Now playing:** {}'.format(filename))
-    except:
-        await ctx.send("The bot is not connected to a voice channel.")
+# @bot.command(name='leave', help='To make the bot leave the voice channel')
+# async def leave(ctx):
+#     voice_client = ctx.message.guild.voice_client
+#     if voice_client.is_connected():
+#         await voice_client.disconnect()
+#     else:
+#         await ctx.send("The bot is not connected to a voice channel.")
 
 
-@bot.command(name='pause', help='This command pauses the song')
-async def pause(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_playing():
-        await voice_client.pause()
-    else:
-        await ctx.send("The bot is not playing anything at the moment.")
+# @bot.command(name='play_song', help='To play song')
+# async def play(ctx, url):
+#     try:
+#         server = ctx.message.guild
+#         voice_channel = server.voice_client
+
+#         async with ctx.typing():
+#             filename = await YTDLSource.from_url(url, loop=bot.loop)
+#             voice_channel.play(discord.FFmpegPCMAudio(
+#                 executable="ffmpeg.exe", source=filename))
+#         await ctx.send('**Now playing:** {}'.format(filename))
+#     except:
+#         await ctx.send("The bot is not connected to a voice channel.")
 
 
-@bot.command(name='resume', help='Resumes the song')
-async def resume(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_paused():
-        await voice_client.resume()
-    else:
-        await ctx.send("The bot was not playing anything before this. Use play_song command")
+# @bot.command(name='pause', help='This command pauses the song')
+# async def pause(ctx):
+#     voice_client = ctx.message.guild.voice_client
+#     if voice_client.is_playing():
+#         await voice_client.pause()
+#     else:
+#         await ctx.send("The bot is not playing anything at the moment.")
 
 
-@bot.command(name='stop', help='Stops the song')
-async def stop(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_playing():
-        await voice_client.stop()
-    else:
-        await ctx.send("The bot is not playing anything at the moment.")
+# @bot.command(name='resume', help='Resumes the song')
+# async def resume(ctx):
+#     voice_client = ctx.message.guild.voice_client
+#     if voice_client.is_paused():
+#         await voice_client.resume()
+#     else:
+#         await ctx.send("The bot was not playing anything before this. Use play_song command")
+
+
+# @bot.command(name='stop', help='Stops the song')
+# async def stop(ctx):
+#     voice_client = ctx.message.guild.voice_client
+#     if voice_client.is_playing():
+#         await voice_client.stop()
+#     else:
+#         await ctx.send("The bot is not playing anything at the moment.")
 
 
 @client.event
 async def on_message(message):
     global voice_clients
-    perintah = '!ILY'
+    perintah = '!ILO'
     if message.author == client.user:
         return
 
@@ -274,7 +276,7 @@ async def on_message(message):
             try:
                 info = ydl.extract_info(video_url, download=False)
                 url2 = info['formats'][0]['url']
-                print(url2)
+              #  print(url2)
             # Extract the song title from video metadata
                 #song_title = info['title']
                 song_title = message.content[len(f"{perintah} play"):].strip()
@@ -298,34 +300,37 @@ async def on_message(message):
                 await message.channel.send(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
                 print("Playing music...")  # Add this line for debugging
 
-                while voice_client.is_playing():
-                    await asyncio.sleep(1)
-                print("Finished playing.")  # Add this line for debugging
+                while voice_client.is_playing() or voice_client.is_paused():
+                    message = await client.wait_for('message')
+    
+                    if message.content.startswith(f"{perintah} pause"):
+                        if voice_client.is_playing():
+                            voice_client.pause()
+                            print('music paused')
+                            await message.channel.send("Music paused.")
+                        else:
+                            await message.channel.send("There is no music playing to pause.")
+    
+                    elif message.content.startswith(f"{perintah} start"):
+                        if voice_client.is_paused():
+                            voice_client.resume()
+                            print('music resumed')
+                            await message.channel.send("Music resumed.")
+                        else:
+                            await message.channel.send("Music is not paused.")
+    
+                    elif message.content.startswith(f"{perintah} stop"):
+                        if voice_client.is_playing():
+                            voice_client.stop()
+                            await message.channel.send("Music stopped.")
+                        else:
+                            await message.channel.send("There is no music playing to stop.")
+                        
+                        await voice_client.disconnect()
+
+                        await asyncio.sleep(1)
             except Exception as e:
                 print(f"An error occurred during music playback: {e}")
-            finally:
-                await voice_client.disconnect()
-    # elif message.content.startswith(f"{perintah} pause"):
-    #     voice_channel = message.author.voice.channel
-    #     if voice_chan and voice_chan.is_playing():
-    #         voice_chan.pause()
-    #         await message.channel.send('Music paused')
-    #     else:
-    #         await message.channel.send('Tidak ada lagu yang diputar')
-    # elif message.content.startswith(f"{perintah} resume"):
-    #     voice_channel = message.author.voice.channel
-    #     if voice_chan and voice_chan.is_paused():
-    #         voice_chan.resume()
-    #         await message.channel.send('Lagu kembali diputar')
-    #     else:
-    #         await message.channel.send('Tidak ada lagu yang diputar')
-    # elif message.content.startswith(f"{perintah} stop"):
-    #     voice_channel = message.author.voice.channel
-    #     if voice_chan and voice_chan.is_playing() or voice_chan.is_paused():
-    #         voice_chan.stop()
-    #         await message.channel.send(f"Lagu dihentikan")
-    #     else:
-    #         await message.channel.send(f"Tidak ada lagu yang diputar")
 
     elif message.content.startswith(f"{perintah} lirik lagu"):
         # Get the song title from the user's message
@@ -378,8 +383,8 @@ async def on_message(message):
         await message.channel.send(output)
     elif message.content.startswith(f"{perintah} backup"):
         database_name = message.content.split(" ")[2]
-        path_file = f"/Users/rafiizzatulrizqufaris/Documents/python_upi/{database_name}.sql"
-        cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} {database_name} > {path_file}"
+        # path_file = f"/Users/rafiizzatulrizqufaris/Documents/python_upi/{database_name}.sql"
+        cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} {database_name} > {PATH_FILE}/{database_name}.sql"
         try:
             # Run the backup command
             result = subprocess.run(
@@ -403,9 +408,9 @@ async def on_message(message):
             await message.channel.send(f"Sir {message.author.mention} \n Database backup completed successfully. /n Here {file_link}")
 
         # Send the backup file to the same channel
-            backup_file = discord.File(f"{path_file}")
+            backup_file = discord.File(f"{PATH_FILE}/{database_name}.sql")
             await message.channel.send(file=backup_file)
-            os.remove(path_file)
+            os.remove(f"{PATH_FILE}/{database_name}.sql")
 
         except subprocess.CalledProcessError as e:
             # If the command returns a non-zero exit code, there was an error
