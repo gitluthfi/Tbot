@@ -22,6 +22,8 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+from oauth2client.service_account import ServiceAccountCredentials
+
 
 import certifi
 import urllib3
@@ -37,7 +39,7 @@ DB_PORT = os.getenv('DB_PORT')
 DB_USER = os.getenv('DB_USERNAME')
 DB_PW = os.getenv('DB_PASSWORD')
 PATH_FILE= os.getenv('PATH_FILE')
-
+ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
 genius = lyricsgenius.Genius(GENIUS_API)
@@ -84,112 +86,14 @@ async def on_ready():
             if general_channel.permissions_for(guild.me).send_messages:
                 await general_channel.send("@everyone ILY ready to serve!")
 
-# youtube_dl.utils.bug_reports_message = lambda: ''
-
-# ytdl_format_options = {
-#     'format': 'bestaudio/best',
-#     'restrictfilenames': True,
-#     'noplaylist': True,
-#     'nocheckcertificate': True,
-#     'ignoreerrors': False,
-#     'logtostderr': False,
-#     'quiet': True,
-#     'no_warnings': True,
-#     'default_search': 'auto',
-#     # bind to ipv4 since ipv6 addresses cause issues sometimes
-#     'source_address': '0.0.0.0'
-# }
-
-# ffmpeg_options = {
-#     'options': '-vn'
-# }
-
-# ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
-
-
-# class YTDLSource(discord.PCMVolumeTransformer):
-#     def __init__(self, source, *, data, volume=0.5):
-#         super().__init__(source, volume)
-#         self.data = data
-#         self.title = data.get('title')
-#         self.url = ""
-
-#     @classmethod
-#     async def from_url(cls, url, *, loop=None, stream=False):
-#         loop = loop or asyncio.get_event_loop()
-#         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-#         if 'entries' in data:
-#             # take first item from a playlist
-#             data = data['entries'][0]
-#         filename = data['title'] if stream else ytdl.prepare_filename(data)
-#         return filename
-
-
-# @bot.command(name='join', help='Tells the bot to join the voice channel')
-# async def join(ctx):
-#     if not ctx.message.author.voice:
-#         await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
-#         return
-#     else:
-#         channel = ctx.message.author.voice.channel
-#     await channel.connect()
-
-
-# @bot.command(name='leave', help='To make the bot leave the voice channel')
-# async def leave(ctx):
-#     voice_client = ctx.message.guild.voice_client
-#     if voice_client.is_connected():
-#         await voice_client.disconnect()
-#     else:
-#         await ctx.send("The bot is not connected to a voice channel.")
-
-
-# @bot.command(name='play_song', help='To play song')
-# async def play(ctx, url):
-#     try:
-#         server = ctx.message.guild
-#         voice_channel = server.voice_client
-
-#         async with ctx.typing():
-#             filename = await YTDLSource.from_url(url, loop=bot.loop)
-#             voice_channel.play(discord.FFmpegPCMAudio(
-#                 executable="ffmpeg.exe", source=filename))
-#         await ctx.send('**Now playing:** {}'.format(filename))
-#     except:
-#         await ctx.send("The bot is not connected to a voice channel.")
-
-
-# @bot.command(name='pause', help='This command pauses the song')
-# async def pause(ctx):
-#     voice_client = ctx.message.guild.voice_client
-#     if voice_client.is_playing():
-#         await voice_client.pause()
-#     else:
-#         await ctx.send("The bot is not playing anything at the moment.")
-
-
-# @bot.command(name='resume', help='Resumes the song')
-# async def resume(ctx):
-#     voice_client = ctx.message.guild.voice_client
-#     if voice_client.is_paused():
-#         await voice_client.resume()
-#     else:
-#         await ctx.send("The bot was not playing anything before this. Use play_song command")
-
-
-# @bot.command(name='stop', help='Stops the song')
-# async def stop(ctx):
-#     voice_client = ctx.message.guild.voice_client
-#     if voice_client.is_playing():
-#         await voice_client.stop()
-#     else:
-#         await ctx.send("The bot is not playing anything at the moment.")
-
-
 @client.event
 async def on_message(message):
     global voice_clients
-    perintah = '!ILO'
+    
+    if (ENV == "production"):
+        perintah = '!ILY'
+    elif (ENV == "develop"):
+        perintah = '!ILO'
     if message.author == client.user:
         return
 
@@ -383,38 +287,38 @@ async def on_message(message):
         await message.channel.send(output)
     elif message.content.startswith(f"{perintah} backup"):
         database_name = message.content.split(" ")[2]
-        # path_file = f"/Users/rafiizzatulrizqufaris/Documents/python_upi/{database_name}.sql"
-        cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} {database_name} > {PATH_FILE}/{database_name}.sql"
+        cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} -p{DB_PW} {database_name} > {PATH_FILE}/{database_name}.sql"
         try:
             # Run the backup command
-            result = subprocess.run(
-                cmd, shell=True, text=True, check=True)
+            result = subprocess.run(cmd, shell=True, text=True, check=True)
 
-        # Authenticate with Google Drive using the JSON key file
+            # Authenticate with Google Drive using the service account key file
             gauth = GoogleAuth()
-            gauth.LoadClientConfigFile('client_secret.json')  # <-----
-            # This creates a local webserver and automatically handles authentication.
-            gauth.LocalWebserverAuth()
+            gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                './ily-bot-405907-3118d738aca8.json', ['https://www.googleapis.com/auth/drive']
+            )
 
-        # Create a GoogleDrive client
+            # Create a GoogleDrive client
             drive = GoogleDrive(gauth)
+            print(f"Authenticated as: {gauth.credentials.service_account_email}")
 
             destination_folder_id = FOLDER_ID
-            file = drive.CreateFile({'title': f'{database_name}.sql', 'parents': [
-                                    {'id': destination_folder_id}]})
+            file = drive.CreateFile({'title': f'{database_name}.sql', 'parents': [{'id': destination_folder_id}]})
             file.Upload()
             file_link = file['alternateLink']
-        # Send a success message
-            await message.channel.send(f"Sir {message.author.mention} \n Database backup completed successfully. /n Here {file_link}")
 
-        # Send the backup file to the same channel
+            # Send a success message
+            await message.channel.send(f"Sir {message.author.mention} \n Database backup completed successfully. \n Here {file_link}")
+
+            # Send the backup file to the same channel
             backup_file = discord.File(f"{PATH_FILE}/{database_name}.sql")
-            await message.channel.send(file=backup_file)
+            # await message.channel.send(file=backup_file)
             os.remove(f"{PATH_FILE}/{database_name}.sql")
 
         except subprocess.CalledProcessError as e:
             # If the command returns a non-zero exit code, there was an error
             await message.channel.send(f"Error during database backup:\n```{e.stderr}```")
+
     elif message.content.startswith(f"{perintah} run"):
         # Split the message content into parts
         parts = message.content.split(" ")
@@ -427,7 +331,7 @@ async def on_message(message):
             user_query = " ".join(parts[3:])
 
         # Construct the MySQL command with proper quoting
-            cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e \"{user_query}\" {database_name}"
+            cmd = f"mysql -h {DB_HOST} -u {DB_USER} -p{DB_PW} -e \"{user_query}\" {database_name}"
 
         try:
             # Run the query command
@@ -459,7 +363,7 @@ async def on_message(message):
             user_query = " ".join(parts[3:])
 
         # Construct the MySQL command with proper quoting
-        cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e \"{user_query}\" {database_name}"
+        cmd = f"mysql -h {DB_HOST} -u {DB_USER} -p{DB_PW} -e \"{user_query}\" {database_name}"
 
         try:
             # Run the query command
