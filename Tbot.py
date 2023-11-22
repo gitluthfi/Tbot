@@ -2,6 +2,7 @@
 # watch this bro, this unreal
 # https://www.youtube.com/watch?v=Ghe058HpmMk&ab_channel=JaredThomas
 
+import docker
 import os
 import ssl
 import subprocess
@@ -42,6 +43,7 @@ PATH_FILE= os.getenv('PATH_FILE')
 ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
+docker_client = docker.from_env()
 genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
@@ -288,6 +290,7 @@ async def on_message(message):
     elif message.content.startswith(f"{perintah} backup"):
         database_name = message.content.split(" ")[2]
         cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} -p{DB_PW} {database_name} > {PATH_FILE}/{database_name}.sql"
+        await message.channel.send(f"Mohon tunggu sebentar pesanan mu sedang di proses {message.author.mention}")
         try:
             # Run the backup command
             result = subprocess.run(cmd, shell=True, text=True, check=True)
@@ -393,6 +396,41 @@ async def on_message(message):
         except Exception as e:
             # Handle other exceptions gracefully
             await message.channel.send(f"An error occurred: {e}")
+    elif message.content.startswith(f"{perintah} deploy"):
+        # Parse the command
+        _, _, deploy_command = message.content.partition(" ")
+        project_name, tag, environment = deploy_command.split(" ")
+
+        await message.channel.send(f"Mohon tunggu sir {message.author.mention}, pesanan anda sedang di proses")
+
+        # Check if a container with the specified project name and tag exists
+        container_name = f"{project_name}-{environment}"
+        existing_container = None
+
+        for container in docker_client.containers.list(all=True):
+            if container.name == container_name:
+                existing_container = container
+                break
+
+        # Stop and remove the existing container if it exists
+        if existing_container:
+            existing_container.stop()
+            existing_container.remove()
+
+        # Pull the Docker image with the specified project name and tag
+        image_name = f"{project_name}:{tag}"
+        docker_client.images.pull(image_name)
+
+        # Run a new container with port mapping and volume attachment
+        if (project_name == ('sitrendy')):
+            container = docker_client.containers.run(
+                image=image_name,
+                detach=True,
+                ports={'80/tcp': 1010},
+                volumes={'/var/lib/jenkins/workspace/sitrendy/assets': {'bind': '/var/wwwhtml/app/assets', 'mode': 'rw'}},
+                name=container_name
+            )
+        await message.channel.send(f"Deploy completed successfully. Container ID: {container.id}")
 
 
 @bot.event
