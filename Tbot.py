@@ -43,7 +43,7 @@ PATH_FILE= os.getenv('PATH_FILE')
 ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
-docker_client = docker.from_env()
+# docker_client = docker.from_env()
 genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
@@ -66,6 +66,36 @@ sslcontext = ssl.create_default_context()
 sslcontext.check_hostname = False
 sslcontext.verify_mode = ssl.CERT_NONE
 
+async def play_next_song(message):
+    song_queue = []
+
+    if song_queue:
+        next_song = song_queue.pop(0)
+        next_title = next_song['title']
+        next_url = next_song['url']
+
+        # Fetch lyrics for the next song
+        try:
+            next_song_lyrics = genius.search_song(next_title)
+            if next_song_lyrics:
+                next_lyrics = next_song_lyrics.lyrics
+                file_name = f"{next_title}_lyrics.txt"
+                with open(file_name, "w", encoding="utf-8") as lyrics_file:
+                    lyrics_file.write(next_lyrics)
+                with open(file_name, "rb") as lyrics_file:
+                    await message.channel.send(f"**Lyrics for {next_title}:**", file=discord.File(lyrics_file, file_name))
+                os.remove(file_name)
+            else:
+                await message.channel.send(f"Lyrics not found for {next_title}.")
+        except Exception as e:
+            await message.channel.send(f"An error occurred while fetching lyrics: {e}")
+
+        # Play the next song
+        voice_client.play(discord.FFmpegPCMAudio(next_url), after=lambda e: asyncio.run_coroutine_threadsafe(play_next_song(message), client.loop))
+        await message.channel.send(f"Now playing: {next_title}")
+    else:
+        # Disconnect if there are no more songs in the queue
+        await voice_client.disconnect()
 
 @client.event
 async def on_ready():
@@ -206,6 +236,7 @@ async def on_message(message):
                 await message.channel.send(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
                 print("Playing music...")  # Add this line for debugging
 
+
                 while voice_client.is_playing() or voice_client.is_paused():
                     message = await client.wait_for('message')
     
@@ -235,33 +266,11 @@ async def on_message(message):
                         await voice_client.disconnect()
 
                         await asyncio.sleep(1)
+                    elif message.content.startswith(f"{perintah} next ")
+                    elif not voice_client.is_playing():
+                        await play_next_song(message)
             except Exception as e:
                 print(f"An error occurred during music playback: {e}")
-
-    elif message.content.startswith(f"{perintah} lirik lagu"):
-        # Get the song title from the user's message
-        song_title = message.content[len(f"{perintah} getlyrics"):].strip()
-
-        try:
-            song = genius.search_song(song_title)
-            if song:
-                lyrics = song.lyrics
-
-            # Create a text file to store the lyrics
-                file_name = f"{song_title}_lyrics.txt"
-                with open(file_name, "w", encoding="utf-8") as lyrics_file:
-                    lyrics_file.write(lyrics)
-
-            # Send the text file as an attachment
-                with open(file_name, "rb") as lyrics_file:
-                    await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
-
-            # Delete the text file after sending it (optional)
-                os.remove(file_name)
-            else:
-                await message.channel.send("Lyrics not found for this song.")
-        except Exception as e:
-            await message.channel.send(f"An error occurred while fetching lyrics: {e}")
 
     elif message.content.startswith(f"{perintah} show_databases"):
         cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'select DB_ILY.m_staging.database_name, DB_ILY.m_staging.project_name from DB_ILY.m_staging;'"
@@ -307,6 +316,8 @@ async def on_message(message):
 
             destination_folder_id = FOLDER_ID
             file = drive.CreateFile({'title': f'{database_name}.sql', 'parents': [{'id': destination_folder_id}]})
+            path_backup = f"{PATH_FILE}/{database_name}.sql"
+            file.SetContentFile(path_backup)
             file.Upload()
             file_link = file['alternateLink']
 
@@ -397,9 +408,21 @@ async def on_message(message):
             # Handle other exceptions gracefully
             await message.channel.send(f"An error occurred: {e}")
     elif message.content.startswith(f"{perintah} deploy"):
-        # Parse the command
-        _, _, deploy_command = message.content.partition(" ")
-        project_name, tag, environment = deploy_command.split(" ")
+
+    # Split the deploy_command into project_name, tag, and environment
+#        if len(deploy_parts) != 3:
+#            await message.channel.send("Invalid deploy command format. Please provide project_name, tag, and environment.")
+#            return
+        project_name = message.content.split(" ")[2]
+        image = message.content.split(" ")[3]
+        environment = message.content.split(" ")[4]        
+
+        if (environment == "staging"):
+           tag = "latest"
+
+        print(f"Project Name: {project_name}")
+        print(f"Tag: {tag}")
+        print(f"Environment: {environment}")
 
         await message.channel.send(f"Mohon tunggu sir {message.author.mention}, pesanan anda sedang di proses")
 
@@ -418,19 +441,20 @@ async def on_message(message):
             existing_container.remove()
 
         # Pull the Docker image with the specified project name and tag
-        image_name = f"{project_name}:{tag}"
+        image_name = f"{image}:{tag}"
+        print(image_name)
         docker_client.images.pull(image_name)
-
         # Run a new container with port mapping and volume attachment
         if (project_name == ('sitrendy')):
             container = docker_client.containers.run(
                 image=image_name,
                 detach=True,
                 ports={'80/tcp': 1010},
-                volumes={'/var/lib/jenkins/workspace/sitrendy/assets': {'bind': '/var/wwwhtml/app/assets', 'mode': 'rw'}},
+                volumes={'/var/lib/jenkins/workspace/sitrendy/assets': {'bind': '/var/www/html/app/assets', 'mode': 'rw'},
+                         '/var/lib/jenkins/workspace/sitrendy/application/config/config.php': {'bind': '/var/www/html/app/application/config/config.php', 'mode': 'rw'}},
                 name=container_name
             )
-        await message.channel.send(f"Deploy completed successfully. Container ID: {container.id}")
+        await message.channel.send(f"Deploy completed successfully. \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image}")
 
 
 @bot.event
