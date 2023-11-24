@@ -24,6 +24,7 @@ from googleapiclient.errors import HttpError
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
+from collections import deque
 
 
 import certifi
@@ -58,6 +59,7 @@ youtube_dl.utils.urlopen = opener.open
 connector = aiohttp.TCPConnector(ssl=sslcontext)
 client = discord.Client(connector=connector, intents=intents)
 
+queue = deque()
 
 urllib3.util.ssl_.DEFAULT_CERTS_FILE = certifi.where()
 
@@ -66,36 +68,41 @@ sslcontext = ssl.create_default_context()
 sslcontext.check_hostname = False
 sslcontext.verify_mode = ssl.CERT_NONE
 
-async def play_next_song(message):
-    song_queue = []
+# Rest of your code...
 
-    if song_queue:
-        next_song = song_queue.pop(0)
-        next_title = next_song['title']
-        next_url = next_song['url']
 
-        # Fetch lyrics for the next song
-        try:
-            next_song_lyrics = genius.search_song(next_title)
-            if next_song_lyrics:
-                next_lyrics = next_song_lyrics.lyrics
-                file_name = f"{next_title}_lyrics.txt"
-                with open(file_name, "w", encoding="utf-8") as lyrics_file:
-                    lyrics_file.write(next_lyrics)
-                with open(file_name, "rb") as lyrics_file:
-                    await message.channel.send(f"**Lyrics for {next_title}:**", file=discord.File(lyrics_file, file_name))
-                os.remove(file_name)
-            else:
-                await message.channel.send(f"Lyrics not found for {next_title}.")
-        except Exception as e:
-            await message.channel.send(f"An error occurred while fetching lyrics: {e}")
+# async def play_next_song(message):
+#     song_queue = []
 
-        # Play the next song
-        voice_client.play(discord.FFmpegPCMAudio(next_url), after=lambda e: asyncio.run_coroutine_threadsafe(play_next_song(message), client.loop))
-        await message.channel.send(f"Now playing: {next_title}")
-    else:
-        # Disconnect if there are no more songs in the queue
-        await voice_client.disconnect()
+#     if song_queue:
+#         next_song = song_queue.pop(0)
+#         next_title = next_song['title']
+#         next_url = next_song['url']
+
+#         # Fetch lyrics for the next song
+#         try:
+#             next_song_lyrics = genius.search_song(next_title)
+#             if next_song_lyrics:
+#                 next_lyrics = next_song_lyrics.lyrics
+#                 file_name = f"{next_title}_lyrics.txt"
+#                 with open(file_name, "w", encoding="utf-8") as lyrics_file:
+#                     lyrics_file.write(next_lyrics)
+#                 with open(file_name, "rb") as lyrics_file:
+#                     await message.channel.send(f"**Lyrics for {next_title}:**", file=discord.File(lyrics_file, file_name))
+#                 os.remove(file_name)
+#             else:
+#                 await message.channel.send(f"Lyrics not found for {next_title}.")
+#         except Exception as e:
+#             await message.channel.send(f"An error occurred while fetching lyrics: {e}")
+
+#         # Play the next song
+#         voice_client.play(discord.FFmpegPCMAudio(next_url), after=lambda e: asyncio.run_coroutine_threadsafe(play_next_song(message), client.loop))
+#         await message.channel.send(f"Now playing: {next_title}")
+#     else:
+#         # Disconnect if there are no more songs in the queue
+#         await voice_client.disconnect()
+
+
 
 @client.event
 async def on_ready():
@@ -122,6 +129,130 @@ async def on_ready():
 async def on_message(message):
     global voice_clients
     
+    async def play_song(video_url):
+        ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'opus',
+                    'preferredquality': '256',
+                }],
+                'restrictfilenames': True,
+                'noplaylist': True,
+                'nocheckcertificate': True,
+                'ignoreerrors': False,
+                'logtostderr': False,
+                'quiet': True,
+                'no_warnings': True,
+                'default_search': 'auto',
+                # bind to ipv4 since ipv6 addresses cause issues sometimes
+                'source_address': '0.0.0.0',
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            }
+        ffmpeg_options = {
+            'options': '-vn -b:a 256k -af loudnorm',
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            }
+
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    info = ydl.extract_info(video_url, download=False)
+                    print(info)
+                    url2 = info['formats'][0]['url']
+                #  print(url2)
+                # Extract the song title from video metadata
+                    #song_title = info['title']
+                    song_title = message.content[len(f"{perintah} play"):].strip()
+                # Fetch lyrics for the song title
+                    song = genius.search_song(song_title)
+                    if song:
+                        lyrics = song.lyrics
+                        file_name = f"{song_title}_lyrics.txt"
+                        with open(file_name, "w", encoding="utf-8") as lyrics_file:
+                            lyrics_file.write(lyrics)
+                        with open(file_name, "rb") as lyrics_file:
+                            await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
+                        os.remove(file_name)
+                    else:
+                        await message.channel.send("Lyrics not found for this song.")
+                except Exception as e:
+                    await message.channel.send(f"An error occurred while fetching lyrics: {e}")
+
+                voice_client.play(discord.FFmpegPCMAudio(url2))
+                await message.channel.send(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
+                print("Playing music...")  # Add this line for debugging
+                # finally:
+                #     voice_client.disconnect()
+                #     print('disconnect')
+
+    async def parse_lagu(url):
+        videosSearch = VideosSearch(url, limit=1)
+    #Data hasil pencarian
+        results = videosSearch.result()
+        video_url = results['result'][0]['link']
+        if not results:
+            await message.channel.send("No matching videos found.")
+            return
+        return video_url
+    
+    async def play_next_song(message):
+        voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
+        while queue:
+            song = queue.popleft()
+            await play_song(song)
+
+            # Wait for the current song to finish
+            while voice_client.is_playing() or voice_client.is_paused():
+                await asyncio.sleep(1)
+
+                try:
+                    message = await client.wait_for('message', timeout=1)
+                    if message.content.startswith(f"{perintah} pause"):
+                        if voice_client.is_playing():
+                            voice_client.pause()
+                            print('music paused')
+                            await message.channel.send("Music paused.")
+                        else:
+                            await message.channel.send("There is no music playing to pause.")
+                    
+                    elif message.content.startswith(f"{perintah} start"):
+                            if voice_client.is_paused():
+                                voice_client.resume()
+                                print('music resumed')
+                                await message.channel.send("Music resumed.")
+                            else:
+                                await message.channel.send("Music is not paused.")
+                        
+                    elif message.content.startswith(f"{perintah} stop"):
+                        if voice_client.is_playing():
+                            voice_client.stop()
+                            await message.channel.send("Music stopped.")
+                        else:
+                            await message.channel.send("There is no music playing to stop.")                
+                            # await voice_client.disconnect()
+                    elif message.content.startswith(f"{perintah} skip"):
+                        await skip_song(message)
+                    elif message.content.startswith(f"{perintah} add"):
+                        queue_url = message.content[len(f"{perintah} add"):].strip()
+                        queue_video_url = await parse_lagu(queue_url)
+                        queue.append(queue_video_url)
+                        await message.channel.send(f"Musik masuk ke antrian {queue_video_url}")
+                        await message.channel.send(queue)
+                except asyncio.TimeoutError:
+                    continue
+
+        await voice_client.disconnect()
+
+    async def skip_song(message):
+        voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
+        
+        if voice_client.is_playing():
+            voice_client.stop()
+            await message.channel.send("Song skipped.")
+            await play_next_song(message)
+        else:
+            await message.channel.send("There is no song playing to skip.")
     if (ENV == "production"):
         perintah = '!ILY'
     elif (ENV == "develop"):
@@ -165,17 +296,7 @@ async def on_message(message):
         await message.channel.send('hai, ali')
 
     elif message.content.startswith(f"{perintah} play"):
-        # Mendapatkan URL lagu dari pesan pengguna
-        url = message.content[len(f"{perintah} play"):].strip()
-        #song_title = message.content[len(f"{perintah} play"):].strip()
-        videosSearch = VideosSearch(url, limit=1)
-
-        results = videosSearch.result()
-        if not results:
-            await message.channel.send("No matching videos found.")
-            return
-
-        video_url = results['result'][0]['link']
+        #connect ke voice channel
         if message.author.voice is None:
             await message.channel.send("Anda harus bergabung dengan channel suara terlebih dahulu.")
             return
@@ -183,94 +304,70 @@ async def on_message(message):
         voice_channel = message.author.voice.channel
         voice_client = await voice_channel.connect()
 
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'opus',
-                'preferredquality': '256',
-            }],
-            'restrictfilenames': True,
-            'noplaylist': True,
-            'nocheckcertificate': True,
-            'ignoreerrors': False,
-            'logtostderr': False,
-            'quiet': True,
-            'no_warnings': True,
-            'default_search': 'auto',
-            # bind to ipv4 since ipv6 addresses cause issues sometimes
-            'source_address': '0.0.0.0',
-            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-        }
-        ffmpeg_options = {
-            'options': '-vn -b:a 256k -af loudnorm',
-            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-        }
+            # Parse search
+        url = message.content[len(f"{perintah} play"):].strip()
+        video_url = await parse_lagu(url)
+            #Ambil link lagu dari data pencarian
+        await message.channel.send('Tunggu sebentar pesanan anda sedang di proses')
+        await play_song(video_url)
+            # Menunggu sampai lagu selesai
+        # while voice_client.is_playing():
+        #     await asyncio.sleep(1)
+        
+    # Disconnect setelah lagu selesai
+        # if not voice_client.is_playing() and not voice_client.is_paused():
+        #     print("Bot tidak sedang memutar atau dipause. Memutar lagu berikutnya.")
+        #     await play_next_song(message)
+        while voice_client.is_playing() or voice_client.is_paused():
+            await asyncio.sleep(1)
 
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             try:
-                info = ydl.extract_info(video_url, download=False)
-                url2 = info['formats'][0]['url']
-              #  print(url2)
-            # Extract the song title from video metadata
-                #song_title = info['title']
-                song_title = message.content[len(f"{perintah} play"):].strip()
-            # Fetch lyrics for the song title
-                try:
-                    song = genius.search_song(song_title)
-                    if song:
-                        lyrics = song.lyrics
-                        file_name = f"{song_title}_lyrics.txt"
-                        with open(file_name, "w", encoding="utf-8") as lyrics_file:
-                            lyrics_file.write(lyrics)
-                        with open(file_name, "rb") as lyrics_file:
-                            await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
-                        os.remove(file_name)
+                message = await client.wait_for('message', timeout=1)
+                if message.content.startswith(f"{perintah} pause"):
+                    if voice_client.is_playing():
+                        voice_client.pause()
+                        print('music paused')
+                        await message.channel.send("Music paused.")
                     else:
-                        await message.channel.send("Lyrics not found for this song.")
-                except Exception as e:
-                    await message.channel.send(f"An error occurred while fetching lyrics: {e}")
-
-                voice_client.play(discord.FFmpegPCMAudio(url2))
-                await message.channel.send(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
-                print("Playing music...")  # Add this line for debugging
-
-
-                while voice_client.is_playing() or voice_client.is_paused():
-                    message = await client.wait_for('message')
-    
-                    if message.content.startswith(f"{perintah} pause"):
-                        if voice_client.is_playing():
-                            voice_client.pause()
-                            print('music paused')
-                            await message.channel.send("Music paused.")
-                        else:
-                            await message.channel.send("There is no music playing to pause.")
-    
-                    elif message.content.startswith(f"{perintah} start"):
+                        await message.channel.send("There is no music playing to pause.")
+                
+                elif message.content.startswith(f"{perintah} start"):
                         if voice_client.is_paused():
                             voice_client.resume()
                             print('music resumed')
                             await message.channel.send("Music resumed.")
                         else:
                             await message.channel.send("Music is not paused.")
-    
-                    elif message.content.startswith(f"{perintah} stop"):
-                        if voice_client.is_playing():
-                            voice_client.stop()
-                            await message.channel.send("Music stopped.")
-                        else:
-                            await message.channel.send("There is no music playing to stop.")
-                        
-                        await voice_client.disconnect()
+                    
+                elif message.content.startswith(f"{perintah} stop"):
+                    if voice_client.is_playing():
+                        voice_client.stop()
+                        await message.channel.send("Music stopped.")
+                    else:
+                        await message.channel.send("There is no music playing to stop.")                
+                        # await voice_client.disconnect()
+                elif message.content.startswith(f"{perintah} skip"):
+                    await skip_song(message)
+                elif message.content.startswith(f"{perintah} add"):
+                    queue_url = message.content[len(f"{perintah} add"):].strip()
+                    queue_video_url = await parse_lagu(queue_url)
+                    queue.append(queue_video_url)
+                    await message.channel.send(f"Musik masuk ke antrian {queue_video_url}")
+                    await message.channel.send(queue)
+            except asyncio.TimeoutError:
+                continue
+        
+            # message = await client.wait_for('message')
+                
+            # except Exception as e:
+            #     print(f"An error occurred during music playback: {e}")
+        if queue:
+            print("next song")
+            await play_next_song(message)
+        else:
+            await voice_client.disconnect()
+        
 
-                        await asyncio.sleep(1)
-                    elif message.content.startswith(f"{perintah} next ")
-                    elif not voice_client.is_playing():
-                        await play_next_song(message)
-            except Exception as e:
-                print(f"An error occurred during music playback: {e}")
 
     elif message.content.startswith(f"{perintah} show_databases"):
         cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'select DB_ILY.m_staging.database_name, DB_ILY.m_staging.project_name from DB_ILY.m_staging;'"
