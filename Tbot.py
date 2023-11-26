@@ -158,12 +158,11 @@ async def on_message(message):
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 try:
                     info = ydl.extract_info(video_url, download=False)
-                    print(info)
+                    # print(info)
                     url2 = info['formats'][0]['url']
-                #  print(url2)
                 # Extract the song title from video metadata
                     #song_title = info['title']
-                    song_title = message.content[len(f"{perintah} play"):].strip()
+                    song_title = info['title']
                 # Fetch lyrics for the song title
                     song = genius.search_song(song_title)
                     if song:
@@ -304,20 +303,12 @@ async def on_message(message):
         voice_channel = message.author.voice.channel
         voice_client = await voice_channel.connect()
 
-            # Parse search
+        # Parse search
         url = message.content[len(f"{perintah} play"):].strip()
         video_url = await parse_lagu(url)
-            #Ambil link lagu dari data pencarian
+        #Ambil link lagu dari data pencarian
         await message.channel.send('Tunggu sebentar pesanan anda sedang di proses')
         await play_song(video_url)
-            # Menunggu sampai lagu selesai
-        # while voice_client.is_playing():
-        #     await asyncio.sleep(1)
-        
-    # Disconnect setelah lagu selesai
-        # if not voice_client.is_playing() and not voice_client.is_paused():
-        #     print("Bot tidak sedang memutar atau dipause. Memutar lagu berikutnya.")
-        #     await play_next_song(message)
         while voice_client.is_playing() or voice_client.is_paused():
             await asyncio.sleep(1)
 
@@ -505,13 +496,7 @@ async def on_message(message):
             # Handle other exceptions gracefully
             await message.channel.send(f"An error occurred: {e}")
     elif message.content.startswith(f"{perintah} deploy"):
-
-    # Split the deploy_command into project_name, tag, and environment
-#        if len(deploy_parts) != 3:
-#            await message.channel.send("Invalid deploy command format. Please provide project_name, tag, and environment.")
-#            return
         project_name = message.content.split(" ")[2]
-        image = message.content.split(" ")[3]
         environment = message.content.split(" ")[4]        
 
         if (environment == "staging"):
@@ -537,21 +522,35 @@ async def on_message(message):
             existing_container.stop()
             existing_container.remove()
 
-        # Pull the Docker image with the specified project name and tag
-        image_name = f"{image}:{tag}"
+        # Check and cleanup docker image    
+        image_name = f"{project_name}:{tag}"
+        existing_image = None
         print(image_name)
-        docker_client.images.pull(image_name)
+
+        for img in docker.client.images.list(name=image_name):
+            existing_image = img
+            break
+        
+        if existing_image:
+            docker.client.image.remove(image_name)
+
+        #build docker file
+        if (project_name == ('sitrendy')):
+            build_path = '/var/lib/jenkins/workspace/sitrendy'
+            docker_client.images.build(
+                path=dockerfile_path,
+                tag=image_name
+            )
         # Run a new container with port mapping and volume attachment
         if (project_name == ('sitrendy')):
             container = docker_client.containers.run(
                 image=image_name,
                 detach=True,
                 ports={'80/tcp': 1010},
-                volumes={'/var/lib/jenkins/workspace/sitrendy/assets': {'bind': '/var/www/html/app/assets', 'mode': 'rw'},
-                         '/var/lib/jenkins/workspace/sitrendy/application/config/config.php': {'bind': '/var/www/html/app/application/config/config.php', 'mode': 'rw'}},
+                volumes={'/var/lib/jenkins/workspace/sitrendy': {'bind': '/var/www/html/app', 'mode': 'rw'},},
                 name=container_name
             )
-        await message.channel.send(f"Deploy completed successfully. \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image}")
+        await message.channel.send(f"{project_name} berhasil di deploy sir, {message.author.mention} \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image.tags[0]}")
 
 
 @bot.event
