@@ -44,7 +44,7 @@ PATH_FILE= os.getenv('PATH_FILE')
 ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
-# docker_client = docker.from_env()
+#docker_client = docker.from_env()
 genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
@@ -174,7 +174,7 @@ async def on_message(message):
                             await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
                         os.remove(file_name)
                     else:
-                        await message.channel.send("Lyrics not found for this song.")
+                        await message.channel.send("Lirik tidak ditemukan.")
                 except Exception as e:
                     await message.channel.send(f"An error occurred while fetching lyrics: {e}")
 
@@ -191,9 +191,48 @@ async def on_message(message):
         results = videosSearch.result()
         video_url = results['result'][0]['link']
         if not results:
-            await message.channel.send("No matching videos found.")
+            await message.channel.send("Lagu tidak ditemukan")
             return
         return video_url
+    
+    async def song_handler(message):
+        voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
+        try:
+            message = await client.wait_for('message', timeout=1)
+            if message.content.startswith(f"{perintah} pause"):
+                if voice_client.is_playing():
+                    voice_client.pause()
+                    print('music paused')
+                    await message.channel.send("Music paused.")
+                else:
+                    await message.channel.send("There is no music playing to pause.")
+            
+            elif message.content.startswith(f"{perintah} start"):
+                if voice_client.is_paused():
+                    voice_client.resume()
+                    print('music resumed')
+                    await message.channel.send("Music resumed.")
+                else:
+                    await message.channel.send("Music is not paused.")
+                
+            elif message.content.startswith(f"{perintah} stop"):
+                if voice_client.is_playing():
+                    voice_client.stop()
+                    await message.channel.send("Music stopped.")
+                else:
+                    await message.channel.send("There is no music playing to stop.")
+            
+            elif message.content.startswith(f"{perintah} skip"):
+                await skip_song(message)
+            
+            elif message.content.startswith(f"{perintah} add"):
+                queue_url = message.content[len(f"{perintah} add"):].strip()
+                queue_video_url = await parse_lagu(queue_url)
+                queue.append(queue_video_url)
+                await message.channel.send(f"Musik masuk ke antrian {queue_video_url}")
+        
+        except asyncio.TimeoutError:
+            pass
     
     async def play_next_song(message):
         voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
@@ -204,42 +243,8 @@ async def on_message(message):
             # Wait for the current song to finish
             while voice_client.is_playing() or voice_client.is_paused():
                 await asyncio.sleep(1)
-
-                try:
-                    message = await client.wait_for('message', timeout=1)
-                    if message.content.startswith(f"{perintah} pause"):
-                        if voice_client.is_playing():
-                            voice_client.pause()
-                            print('music paused')
-                            await message.channel.send("Music paused.")
-                        else:
-                            await message.channel.send("There is no music playing to pause.")
-                    
-                    elif message.content.startswith(f"{perintah} start"):
-                            if voice_client.is_paused():
-                                voice_client.resume()
-                                print('music resumed')
-                                await message.channel.send("Music resumed.")
-                            else:
-                                await message.channel.send("Music is not paused.")
-                        
-                    elif message.content.startswith(f"{perintah} stop"):
-                        if voice_client.is_playing():
-                            voice_client.stop()
-                            await message.channel.send("Music stopped.")
-                        else:
-                            await message.channel.send("There is no music playing to stop.")                
-                            # await voice_client.disconnect()
-                    elif message.content.startswith(f"{perintah} skip"):
-                        await skip_song(message)
-                    elif message.content.startswith(f"{perintah} add"):
-                        queue_url = message.content[len(f"{perintah} add"):].strip()
-                        queue_video_url = await parse_lagu(queue_url)
-                        queue.append(queue_video_url)
-                        await message.channel.send(f"Musik masuk ke antrian {queue_video_url}")
-                        await message.channel.send(queue)
-                except asyncio.TimeoutError:
-                    continue
+                #song handler request
+                await song_handler(message)
 
         await voice_client.disconnect()
 
@@ -311,42 +316,8 @@ async def on_message(message):
         await play_song(video_url)
         while voice_client.is_playing() or voice_client.is_paused():
             await asyncio.sleep(1)
-
-            try:
-                message = await client.wait_for('message', timeout=1)
-                if message.content.startswith(f"{perintah} pause"):
-                    if voice_client.is_playing():
-                        voice_client.pause()
-                        print('music paused')
-                        await message.channel.send("Music paused.")
-                    else:
-                        await message.channel.send("There is no music playing to pause.")
-                
-                elif message.content.startswith(f"{perintah} start"):
-                        if voice_client.is_paused():
-                            voice_client.resume()
-                            print('music resumed')
-                            await message.channel.send("Music resumed.")
-                        else:
-                            await message.channel.send("Music is not paused.")
-                    
-                elif message.content.startswith(f"{perintah} stop"):
-                    if voice_client.is_playing():
-                        voice_client.stop()
-                        await message.channel.send("Music stopped.")
-                    else:
-                        await message.channel.send("There is no music playing to stop.")                
-                        # await voice_client.disconnect()
-                elif message.content.startswith(f"{perintah} skip"):
-                    await skip_song(message)
-                elif message.content.startswith(f"{perintah} add"):
-                    queue_url = message.content[len(f"{perintah} add"):].strip()
-                    queue_video_url = await parse_lagu(queue_url)
-                    queue.append(queue_video_url)
-                    await message.channel.send(f"Musik masuk ke antrian {queue_video_url}")
-                    await message.channel.send(queue)
-            except asyncio.TimeoutError:
-                continue
+            #song handler request
+            await song_handler(message)
         
             # message = await client.wait_for('message')
                 
@@ -497,7 +468,7 @@ async def on_message(message):
             await message.channel.send(f"An error occurred: {e}")
     elif message.content.startswith(f"{perintah} deploy"):
         project_name = message.content.split(" ")[2]
-        environment = message.content.split(" ")[4]        
+        environment = message.content.split(" ")[3]        
 
         if (environment == "staging"):
            tag = "latest"
@@ -527,18 +498,18 @@ async def on_message(message):
         existing_image = None
         print(image_name)
 
-        for img in docker.client.images.list(name=image_name):
+        for img in docker_client.images.list(name=image_name):
             existing_image = img
             break
         
         if existing_image:
-            docker.client.image.remove(image_name)
-
+            docker_client.images.remove(image_name)
+        await message.channel.send(f"Sir {message.author.mention}, Pesananmu sedang dalam proses build, tunggu sebentar ya!! \n Sambil menunggu proses build, nikmati layanan musik saya, dapat diakses dengan command {perintah} play judul_lagu_anda")
         #build docker file
         if (project_name == ('sitrendy')):
             build_path = '/var/lib/jenkins/workspace/sitrendy'
             docker_client.images.build(
-                path=dockerfile_path,
+                path=build_path,
                 tag=image_name
             )
         # Run a new container with port mapping and volume attachment
