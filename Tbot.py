@@ -27,6 +27,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from collections import deque
 
 
+
 import certifi
 import urllib3
 import urllib
@@ -61,47 +62,13 @@ client = discord.Client(connector=connector, intents=intents)
 
 queue = deque()
 
+
 urllib3.util.ssl_.DEFAULT_CERTS_FILE = certifi.where()
 
 # Disable SSL certificate verification
 sslcontext = ssl.create_default_context()
 sslcontext.check_hostname = False
 sslcontext.verify_mode = ssl.CERT_NONE
-
-# Rest of your code...
-
-
-# async def play_next_song(message):
-#     song_queue = []
-
-#     if song_queue:
-#         next_song = song_queue.pop(0)
-#         next_title = next_song['title']
-#         next_url = next_song['url']
-
-#         # Fetch lyrics for the next song
-#         try:
-#             next_song_lyrics = genius.search_song(next_title)
-#             if next_song_lyrics:
-#                 next_lyrics = next_song_lyrics.lyrics
-#                 file_name = f"{next_title}_lyrics.txt"
-#                 with open(file_name, "w", encoding="utf-8") as lyrics_file:
-#                     lyrics_file.write(next_lyrics)
-#                 with open(file_name, "rb") as lyrics_file:
-#                     await message.channel.send(f"**Lyrics for {next_title}:**", file=discord.File(lyrics_file, file_name))
-#                 os.remove(file_name)
-#             else:
-#                 await message.channel.send(f"Lyrics not found for {next_title}.")
-#         except Exception as e:
-#             await message.channel.send(f"An error occurred while fetching lyrics: {e}")
-
-#         # Play the next song
-#         voice_client.play(discord.FFmpegPCMAudio(next_url), after=lambda e: asyncio.run_coroutine_threadsafe(play_next_song(message), client.loop))
-#         await message.channel.send(f"Now playing: {next_title}")
-#     else:
-#         # Disconnect if there are no more songs in the queue
-#         await voice_client.disconnect()
-
 
 
 @client.event
@@ -157,33 +124,35 @@ async def on_message(message):
 
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 try:
+                    #extract video_url to youtube_dl so discord can play song
                     info = ydl.extract_info(video_url, download=False)
-                    # print(info)
+                    # got the real url from extracted url
                     url2 = info['formats'][0]['url']
-                # Extract the song title from video metadata
-                    #song_title = info['title']
-                    song_title = info['title']
-                # Fetch lyrics for the song title
-                    song = genius.search_song(song_title)
-                    if song:
-                        lyrics = song.lyrics
-                        file_name = f"{song_title}_lyrics.txt"
-                        with open(file_name, "w", encoding="utf-8") as lyrics_file:
-                            lyrics_file.write(lyrics)
-                        with open(file_name, "rb") as lyrics_file:
-                            await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
-                        os.remove(file_name)
-                    else:
-                        await message.channel.send("Lirik tidak ditemukan.")
                 except Exception as e:
-                    await message.channel.send(f"An error occurred while fetching lyrics: {e}")
-
+                    await message.channel.send(f"An error occurred while fetching song: {e}")
+                # play the song
                 voice_client.play(discord.FFmpegPCMAudio(url2))
                 await message.channel.send(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
                 print("Playing music...")  # Add this line for debugging
-                # finally:
-                #     voice_client.disconnect()
-                #     print('disconnect')
+
+
+    async def search_lyric(title):
+        try:
+            song_title = title
+            # Fetch lyrics for the song title
+            song = genius.search_song(song_title)
+            if song:
+                lyrics = song.lyrics
+                file_name = f"{song_title}_lyrics.txt"
+                with open(file_name, "w", encoding="utf-8") as lyrics_file:
+                    lyrics_file.write(lyrics)
+                with open(file_name, "rb") as lyrics_file:
+                    await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
+                os.remove(file_name)
+            else:
+                await message.channel.send("Lirik tidak ditemukan.")
+        except Exception as e:
+            await message.channel.send(f"An error occurred while fetching lyrics: {e}")
 
     async def parse_lagu(url):
         videosSearch = VideosSearch(url, limit=1)
@@ -313,31 +282,25 @@ async def on_message(message):
         video_url = await parse_lagu(url)
         #Ambil link lagu dari data pencarian
         await message.channel.send('Tunggu sebentar pesanan anda sedang di proses')
+        await search_lyric(url)
         await play_song(video_url)
         while voice_client.is_playing() or voice_client.is_paused():
             await asyncio.sleep(1)
             #song handler request
             await song_handler(message)
-        
-            # message = await client.wait_for('message')
-                
-            # except Exception as e:
-            #     print(f"An error occurred during music playback: {e}")
         if queue:
             print("next song")
             await play_next_song(message)
         else:
             await voice_client.disconnect()
         
-
+    elif message.content.startswith(f"{perintah} lirik"):
+        title = message.content[len(f"{perintah} lirik"):].strip()
+        await search_lyric(title)
 
     elif message.content.startswith(f"{perintah} show_databases"):
         cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'select DB_ILY.m_staging.database_name, DB_ILY.m_staging.project_name from DB_ILY.m_staging;'"
-        # parts = message.content.split(" ")
-        # if len(parts) >= 1:
-        #     link = " ".join(parts[1:])
-        #     cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'select DB_ILY.m_staging.database_name, DB_ILY.m_staging.project_name from DB_ILY.m_staging;"
-
+        
         if message.content.startswith(f"{perintah} show_databases"):
             parts = message.content.split(" ")
             if len(parts) >= 2:
@@ -467,6 +430,8 @@ async def on_message(message):
             # Handle other exceptions gracefully
             await message.channel.send(f"An error occurred: {e}")
     elif message.content.startswith(f"{perintah} deploy"):
+
+        # parse
         project_name = message.content.split(" ")[2]
         environment = message.content.split(" ")[3]        
 
@@ -498,19 +463,20 @@ async def on_message(message):
         existing_image = None
         print(image_name)
 
-        for img in docker_client.images.list(name=image_name):
+        for img in docker_client.images.list(name=project_name):
             existing_image = img
             break
         
         if existing_image:
-            docker_client.images.remove(image_name)
+            docker_client.images.remove(project_name)
         await message.channel.send(f"Sir {message.author.mention}, Pesananmu sedang dalam proses build, tunggu sebentar ya!! \n Sambil menunggu proses build, nikmati layanan musik saya, dapat diakses dengan command {perintah} play judul_lagu_anda")
         #build docker file
         if (project_name == ('sitrendy')):
             build_path = '/var/lib/jenkins/workspace/sitrendy'
             docker_client.images.build(
                 path=build_path,
-                tag=image_name
+                tag=image_name,
+                rm=True
             )
         # Run a new container with port mapping and volume attachment
         if (project_name == ('sitrendy')):
@@ -522,7 +488,6 @@ async def on_message(message):
                 name=container_name
             )
         await message.channel.send(f"{project_name} berhasil di deploy sir, {message.author.mention} \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image.tags[0]}")
-
 
 @bot.event
 async def on_message(message):
