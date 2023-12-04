@@ -545,7 +545,8 @@ async def on_message(message):
                 cmd = f"cd {dir_project} && {user_command}"
                 try:
                     result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-                    chunks = [result.stdout[i:i + 2000] for i in range(0, len(result.stdout), 2000)]
+                    chunk_size = 1900  # Adjust the chunk size based on your needs
+                    chunks = [result.stdout[i:i + chunk_size] for i in range(0, len(result.stdout), chunk_size)]
                     for chunk in chunks:
                         await message.reply(f"Command executed successfully:\n```{chunk}```")
                 except subprocess.CalledProcessError as e:
