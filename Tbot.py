@@ -545,9 +545,9 @@ async def on_message(message):
                 cmd = f"cd {dir_project} && {user_command}"
                 try:
                     result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-                    await message.reply(f"Command executed successfully:\n{result.stdout}")
+                    await message.reply(f"Command executed successfully:\n```{result.stdout}```")
                 except subprocess.CalledProcessError as e:
-                    await message.reply(f"Command failed with error:\n{e.stderr}")
+                    await message.reply(f"Command failed with error:\n```{e.stderr}```")
             else:
                 await message.reply(f"Invalid project name: {project_name}")
         else:
