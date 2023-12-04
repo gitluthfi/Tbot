@@ -1,2 +1,5 @@
 .env
 sni.cloudflaressl.com.cer
+download.html
+download.js
+download.py

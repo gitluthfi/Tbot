@@ -45,7 +45,7 @@ PATH_FILE= os.getenv('PATH_FILE')
 ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
-docker_client = docker.from_env()
+#docker_client = docker.from_env()
 genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
@@ -96,7 +96,7 @@ async def on_ready():
 async def on_message(message):
     global voice_clients
     
-    async def play_song(video_url):
+    async def play_song(message, video_url):
         ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
@@ -125,18 +125,19 @@ async def on_message(message):
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 try:
                     #extract video_url to youtube_dl so discord can play song
-                    info = ydl.extract_info(video_url, download=False)
+                    url1 = video_url['url']
+                    info = ydl.extract_info(url1, download=False)
                     # got the real url from extracted url
                     url2 = info['formats'][0]['url']
                 except Exception as e:
                     await message.reply(f"An error occurred while fetching song: {e}")
                 # play the song
                 voice_client.play(discord.FFmpegPCMAudio(url2))
-                await message.reply(f"Lagu anda diputar, ENJOY!!! \n {video_url}")
+                await message.reply(f"Lagu anda diputar, ENJOY!!! \n {url1}")
                 print("Playing music...")  # Add this line for debugging
 
 
-    async def search_lyric(title):
+    async def search_lyric(message, title):
         try:
             song_title = title
             # Fetch lyrics for the song title
@@ -147,12 +148,13 @@ async def on_message(message):
                 with open(file_name, "w", encoding="utf-8") as lyrics_file:
                     lyrics_file.write(lyrics)
                 with open(file_name, "rb") as lyrics_file:
-                    await message.reply(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
+                    await message.channel.send(f"**Lyrics for {song_title}:**", file=discord.File(lyrics_file, file_name))
                 os.remove(file_name)
             else:
-                await message.reply("Lirik tidak ditemukan.")
+                await message.channel.send("Lirik tidak ditemukan.")
         except Exception as e:
             await message.reply(f"An error occurred while fetching lyrics: {e}")
+        
 
     async def parse_lagu(url):
         videosSearch = VideosSearch(url, limit=1)
@@ -197,7 +199,12 @@ async def on_message(message):
             elif message.content.startswith(f"{perintah} add"):
                 queue_url = message.content[len(f"{perintah} add"):].strip()
                 queue_video_url = await parse_lagu(queue_url)
-                queue.append(queue_video_url)
+                new_song = {"title": queue_url, "url": queue_video_url}
+                queue.append(new_song)
+                #debugging
+                # print(new_song)
+                # print('batas')
+                # print(queue)
                 await message.reply(f"Musik masuk ke antrian {queue_video_url}")
         
         except asyncio.TimeoutError:
@@ -207,7 +214,8 @@ async def on_message(message):
         voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
         while queue:
             song = queue.popleft()
-            await play_song(song)
+            await search_lyric(message, song['title'])
+            await play_song(message, song)
 
             # Wait for the current song to finish
             while voice_client.is_playing() or voice_client.is_paused():
@@ -282,21 +290,25 @@ async def on_message(message):
         video_url = await parse_lagu(url)
         #Ambil link lagu dari data pencarian
         await message.reply('Tunggu sebentar pesanan anda sedang di proses')
-        await search_lyric(url)
-        await play_song(video_url)
+        new_song = {"title": url, "url": video_url}
+        queue.append(new_song)
+        song = queue.popleft()
+        await search_lyric(message, song['title'])
+        await play_song(message, song)
         while voice_client.is_playing() or voice_client.is_paused():
             await asyncio.sleep(1)
             #song handler request
             await song_handler(message)
         if queue:
-            print("next song")
+            #debugging
+            #print("next song")
             await play_next_song(message)
         else:
             await voice_client.disconnect()
         
     elif message.content.startswith(f"{perintah} lirik"):
         title = message.content[len(f"{perintah} lirik"):].strip()
-        await search_lyric(title)
+        await search_lyric(message, title)
 
     elif message.content.startswith(f"{perintah} show_databases"):
         cmd = f"mysql -h {DB_HOST} -u {DB_USER} -e 'select DB_ILY.m_staging.database_name, DB_ILY.m_staging.project_name from DB_ILY.m_staging;'"
@@ -499,6 +511,18 @@ async def on_message(message):
         else:
             await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
         await message.reply(f"{project_name} berhasil di deploy sir, {message.author.mention} \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image.tags[0]}")
+
+    elif message.content.startswith(f"{perintah} exec"):
+        # parse
+        parts = message.content.split(" ")
+
+        # Check if there are at least 3 parts (command, database name, and user query)
+        if len(parts) >= 4:
+            # Extract the database name and user query
+            database_name = parts[2]
+        # Join the remaining parts to form the user query
+            user_query = " ".join(parts[3:])
+        
 
 @bot.event
 async def on_message(message):
