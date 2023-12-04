@@ -515,13 +515,44 @@ async def on_message(message):
     elif message.content.startswith(f"{perintah} exec"):
         # parse
         parts = message.content.split(" ")
+        base_path = '/var/lib/jenkins/workspace/'
 
         # Check if there are at least 3 parts (command, database name, and user query)
-        if len(parts) >= 4:
-            # Extract the database name and user query
-            database_name = parts[2]
-        # Join the remaining parts to form the user query
-            user_query = " ".join(parts[3:])
+        if len(parts) >= 5 and parts[3] == "--command=":
+            # Extract the database name and user command
+            project_name = parts[2]
+            user_command = " ".join(parts[4:])
+
+            # Map project names to directory names
+            project_mapping = {
+                "pusaka_bantuan": "pusaka_bantuan",
+                "math_be": "math_be",
+                "siaapp": "siaapp",
+                "sitren": "sitren_new",
+                "ijop_mdt": "ijop_mdt",
+                "kemenag_lpdp": "kemenag_lpdp",
+                "lpdp_ongoing": "lpdp_ongoing",
+                "sitrendy": "sitrendy",
+                "cbt_iw": "cbt_iw_2023",
+                "simba": "pontren_bantuan"
+            }
+
+            # Check if the project_name is valid
+            if project_name in project_mapping:
+                dir_project = base_path + project_mapping[project_name]
+
+                # Construct the command
+                cmd = f"cd {dir_project} && {user_command}"
+                try:
+                    result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    await message.reply(f"Command executed successfully:\n{result.stdout}")
+                except subprocess.CalledProcessError as e:
+                    await message.reply(f"Command failed with error:\n{e.stderr}")
+            else:
+                await message.reply(f"Invalid project name: {project_name}")
+        else:
+            await message.reply("Invalid command format, `!ILO exec --command= your_command_here`")
+
         
 
 @bot.event
