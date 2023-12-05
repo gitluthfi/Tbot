@@ -332,6 +332,9 @@ async def on_message(message):
         await message.reply(output)
     elif message.content.startswith(f"{perintah} backup"):
         database_name = message.content.split(" ")[2]
+        if not database_name:
+            await message.reply("Perintah tidak lengkap, Format perintah `!ILY backup (database_name)`")
+            return
         cmd = f"mysqldump -h {DB_HOST} -u {DB_USER} -p{DB_PW} {database_name} > {PATH_FILE}/{database_name}.sql"
         await message.reply(f"Mohon tunggu sebentar pesanan mu sedang di proses {message.author.mention}")
         try:
@@ -453,7 +456,7 @@ async def on_message(message):
 
             if (environment == "staging"):
                 tag = "latest"
-
+            #debugging 
             print(f"Project Name: {project_name}")
             print(f"Tag: {tag}")
             print(f"Environment: {environment}")
@@ -534,7 +537,12 @@ async def on_message(message):
                 "lpdp_ongoing": "lpdp_ongoing",
                 "sitrendy": "sitrendy",
                 "cbt_iw": "cbt_iw_2023",
-                "simba": "pontren_bantuan"
+                "simba": "pontren_bantuan",
+                "pmb_staispa": "pmb_staispa",
+                "sso_pusaka": "sso_pusaka",
+                "pendaftaran_pbsb": "pbsb_2023",
+                "sisfodema": "pai_pendataan_dosen",
+                "cbt_iw": "cbt_iw_2023"
             }
 
             # Check if the project_name is valid
@@ -545,18 +553,19 @@ async def on_message(message):
                 cmd = f"cd {dir_project} && {user_command}"
                 try:
                     result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-                    chunk_size = 1900  # Adjust the chunk size based on your needs
-                    chunks = [result.stdout[i:i + chunk_size] for i in range(0, len(result.stdout), chunk_size)]
-                    for chunk in chunks:
+                    chunk_size = 1900  # batas discord ngirim pesan cuy
+                    chunks = [result.stdout[i:i + chunk_size] for i in range(0, len(result.stdout), chunk_size)] #satuin setiap command yang kepecah karena chungks
+                    for chunk in chunks: # kirim setiap chunks
                         await message.reply(f"Command executed successfully:\n```{chunk}```")
-                except subprocess.CalledProcessError as e:
+                except subprocess.CalledProcessError as e: #eror handling
                     await message.reply(f"Command failed with error:\n```{e.stderr}```")
-            else:
+            else: # error handling
                 await message.reply(f"Invalid project name: {project_name}")
-        else:
-            await message.reply("Invalid command format, `!ILO exec --command= your_command_here`")
+        else: # error handling
+            await message.reply(f"Invalid command format, `{perintah} project_name exec --command= your_command_here`")
 
-        
+    elif message.content.startswith(f"{perintah} --help"):
+        await message.reply(f"`{perintah} play judul_lagu` = Untuk putar lagu \n `{perintah} backup nama_database` = Untuk backup database STAGING \n `{perintah} run nama_database query_anda` = Untuk meng-query database \n `{perintah} get nama_database query_anda` = Untuk mendapatkan hasil dari query \n `{perintah} deploy nama_project envronment` = Untuk deploy by docker dengan build dan run as container \n `{perintah} exec nama_project --command= command_anda` = Untuk menjalankan command di server")
 
 @bot.event
 async def on_message(message):
