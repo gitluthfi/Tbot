@@ -45,7 +45,7 @@ PATH_FILE= os.getenv('PATH_FILE')
 ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
-#docker_client = docker.from_env()
+docker_client = docker.from_env()
 genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
@@ -396,7 +396,7 @@ async def on_message(message):
                 await message.reply(f"Query result for database '{database_name}':\n```{result.stdout}```")
             else:
                 # If there's an error, send an error message
-                await message.reply(f"Error executing the query:\n```{cmd}```")
+                await message.reply(f"Error executing the query:\n```{e.stderr}```")
 
         except Exception as e:
             # Handle other exceptions gracefully
@@ -441,7 +441,7 @@ async def on_message(message):
 
             else:
                 # If there's an error, send an error message
-                await message.reply(f"Error executing the query:\n```{cmd}```")
+                await message.reply(f"Error executing the query:\n```{e.stderr}```")
 
         except Exception as e:
             # Handle other exceptions gracefully
