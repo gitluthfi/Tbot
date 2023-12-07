@@ -14,6 +14,7 @@ import io
 import discord
 import aiohttp
 import lyricsgenius
+import gitlab
 from dotenv import load_dotenv
 from discord.ext import commands
 from urllib.request import build_opener
@@ -45,7 +46,7 @@ PATH_FILE= os.getenv('PATH_FILE')
 ENV= os.getenv('BOT_ENV')
 FOLDER_ID = os.getenv("FOLDER_DRIVE")
 GENIUS_API = os.getenv('GENIUS_API_ID')
-docker_client = docker.from_env()
+#docker_client = docker.from_env()
 genius = lyricsgenius.Genius(GENIUS_API)
 intents = discord.Intents.default()
 intents.members = True
@@ -456,6 +457,8 @@ async def on_message(message):
 
             if (environment == "staging"):
                 tag = "latest"
+            else:
+                await message.reply("environment tidak ditemukan")
             #debugging 
             print(f"Project Name: {project_name}")
             print(f"Tag: {tag}")
@@ -500,6 +503,13 @@ async def on_message(message):
                 tag=image_name,
                 rm=True
             )
+        elif (project_name == ('sitrendy_mobile')):
+            build_path = '/var/lib/jenkins/workspace/sitrendy_mobile'
+            docker_client.images.build(
+                path=build_path,
+                tag=image_name,
+                rm=True
+            )
         else:
             await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
         # Run a new container with port mapping and volume attachment
@@ -509,6 +519,13 @@ async def on_message(message):
                 detach=True,
                 ports={'80/tcp': 1010},
                 volumes={build_path: {'bind': '/var/www/html/app', 'mode': 'rw'},},
+                name=container_name
+            )
+        elif (project_name == ('sitrendy_mobile')):
+            container = docker_client.container.run(
+                image=image_name,
+                detach=True,
+                port={'3000/tcp': 1212},
                 name=container_name
             )
         else:
@@ -594,3 +611,22 @@ async def on_message(message):
 
 
 client.run(TOKEN)
+
+
+'BB02.1-231-0000054',
+'BB02.1-231-0000055',
+'BB02.1-231-0000062',
+'BB02.1-231-0000063',
+'BB02.1-231-0000064',
+'BB02.1-231-0000066',
+'BB02.1-231-0000067',
+'BB02.1-231-0000130',
+'BB02.1-231-0000131',
+'BB02.1-231-0000187',
+'BB02.1-231-0000188',
+'BB02.1-231-0000353',
+'BB02.1-231-0000354',
+'BB02.1-231-0000407',
+'BB02.1-231-0000408',
+'BB02.1-231-0000409',
+'BB02.1-231-0000410',
