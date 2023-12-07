@@ -450,10 +450,37 @@ async def on_message(message):
     elif message.content.startswith(f"{perintah} deploy"):
 
         if len(message.content.split(" ")) == 4:
-
+            
         # parse
             project_name = message.content.split(" ")[2]
             environment = message.content.split(" ")[3]        
+            path_project = '/var/lib/jenkins/workspace/' + project_name
+            project_mapping = {
+            'sitrendy': {
+                'build_path': path_project,
+                'ports': {'80/tcp': 1010},
+                'additional_volumes': {path_project: {'bind': '/var/www/html/app', 'mode': 'rw'}}
+                },
+            'sitrendy_mobile': {
+                'build_path': path_project,
+                'ports': {'3000/tcp': 1212},
+                'additional_volumes': {}
+               },
+            'siaappp': {
+                'build_path': path_project,
+                'ports': {'80/tcp': 1313},
+                'additional_volumes': {path_project: {'bind': '/var/www/html/app', 'mode': 'rw'}}
+                }
+            }
+            if project_name not in project_mapping:
+                await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
+                return
+            
+            project_details = project_mapping[project_name]
+            build_path = project_details['build_path']
+            ports = project_details['ports']
+            additional_volumes = project_details['additional_volumes']
+
 
             if (environment == "staging"):
                 tag = "latest"
@@ -468,7 +495,7 @@ async def on_message(message):
         else:
             await message.reply(f"Sir {message.author.mention}, perintah tidak lengkap mohon lenkapi seperti ini \n `!ILY deploy project_name environment`")    
             return
-
+        
         # Check if a container with the specified project name and tag exists
         container_name = f"{project_name}-{environment}"
         existing_container = None
@@ -495,42 +522,26 @@ async def on_message(message):
         if existing_image:
             docker_client.images.remove(project_name)
         await message.reply(f"Sir {message.author.mention}, Pesananmu sedang dalam proses build, tunggu sebentar ya!! \n Sambil menunggu proses build, nikmati layanan musik saya, dapat diakses dengan command {perintah} play judul_lagu_anda")
-        #build docker file
-        if (project_name == ('sitrendy')):
-            build_path = '/var/lib/jenkins/workspace/sitrendy'
-            docker_client.images.build(
-                path=build_path,
-                tag=image_name,
-                rm=True
-            )
-        elif (project_name == ('sitrendy_mobile')):
-            build_path = '/var/lib/jenkins/workspace/sitrendy_mobile'
-            docker_client.images.build(
-                path=build_path,
-                tag=image_name,
-                rm=True
-            )
-        else:
-            await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
+        # Build docker file
+        docker_client.images.build(
+            path=build_path,
+            tag=image_name,
+            rm=True
+        )
+        
+        await message.reply(f"sir {message.author.mention}, Pesanan sedang di rilis")
         # Run a new container with port mapping and volume attachment
-        if (project_name == ('sitrendy')):
-            container = docker_client.containers.run(
-                image=image_name,
-                detach=True,
-                ports={'80/tcp': 1010},
-                volumes={build_path: {'bind': '/var/www/html/app', 'mode': 'rw'},},
-                name=container_name
-            )
-        elif (project_name == ('sitrendy_mobile')):
-            container = docker_client.containers.run(
-                image=image_name,
-                detach=True,
-                port={'3000/tcp': 1212},
-                name=container_name
-            )
-        else:
-            await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
-        await message.reply(f"{project_name} berhasil di deploy sir, {message.author.mention} \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image.tags[0]}")
+        container = docker_client.containers.run(
+            image=image_name,
+            detach=True,
+            ports=ports,
+            volumes={**{build_path: {'bind': '/var/www/html/app', 'mode': 'rw'}}, **additional_volumes},
+            name=container_name
+        )
+
+        await message.reply(
+            f"{project_name} berhasil di deploy sir, {message.author.mention} \n Container ID: {container.id} \n Container Name: {container.name} \n Container Image: {container.image.tags[0]}"
+        )
 
     elif message.content.startswith(f"{perintah} exec"):
         # parse
