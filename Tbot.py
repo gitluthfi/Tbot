@@ -522,7 +522,7 @@ async def on_message(message):
                 name=container_name
             )
         elif (project_name == ('sitrendy_mobile')):
-            container = docker_client.container.run(
+            container = docker_client.containers.run(
                 image=image_name,
                 detach=True,
                 port={'3000/tcp': 1212},
