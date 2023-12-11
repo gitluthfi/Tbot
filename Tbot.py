@@ -15,6 +15,7 @@ import discord
 import aiohttp
 import lyricsgenius
 import gitlab
+import csv
 from dotenv import load_dotenv
 from discord.ext import commands
 from urllib.request import build_opener
@@ -235,6 +236,13 @@ async def on_message(message):
             await play_next_song(message)
         else:
             await message.reply("There is no song playing to skip.")
+    async def read_project_mapping_from_csv(csv_path):
+        project_mapping = {}
+        with open(csv_path, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                project_mapping[row['project_name']] = row['dir_name']
+        return project_mapping
     if (ENV == "production"):
         perintah = '!ILY'
     elif (ENV == "develop"):
@@ -476,12 +484,13 @@ async def on_message(message):
                 await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
                 return
             
+            # deklarasi ulang
             project_details = project_mapping[project_name]
             build_path = project_details['build_path']
             ports = project_details['ports']
             additional_volumes = project_details['additional_volumes']
 
-
+            # checking envireonment
             if (environment == "staging"):
                 tag = "latest"
             else:
@@ -554,24 +563,9 @@ async def on_message(message):
             project_name = parts[2]
             user_command = " ".join(parts[4:])
 
-            # Map project names to directory names
-            project_mapping = {
-                "pusaka_bantuan": "pusaka_bantuan",
-                "math_be": "math_be",
-                "siaapp": "siaapp",
-                "sitren": "sitren_new",
-                "ijop_mdt": "ijop_mdt",
-                "kemenag_lpdp": "kemenag_lpdp",
-                "lpdp_ongoing": "lpdp_ongoing",
-                "sitrendy": "sitrendy",
-                "cbt_iw": "cbt_iw_2023",
-                "simba": "pontren_bantuan",
-                "pmb_staispa": "pmb_staispa",
-                "sso_pusaka": "sso_pusaka",
-                "pendaftaran_pbsb": "pbsb_2023",
-                "sisfodema": "pai_pendataan_dosen",
-                "cbt_iw": "cbt_iw_2023"
-            }
+            # Map project names to directory names 
+            #dynamic project mapping
+            project_mapping = await read_project_mapping_from_csv("project.csv")
 
             # Check if the project_name is valid
             if project_name in project_mapping:
@@ -579,6 +573,8 @@ async def on_message(message):
 
                 # Construct the command
                 cmd = f"cd {dir_project} && {user_command}"
+                print(cmd)
+                exit()
                 try:
                     result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
                     chunk_size = 1900  # batas discord ngirim pesan cuy
@@ -624,20 +620,3 @@ async def on_message(message):
 client.run(TOKEN)
 
 
-'BB02.1-231-0000054',
-'BB02.1-231-0000055',
-'BB02.1-231-0000062',
-'BB02.1-231-0000063',
-'BB02.1-231-0000064',
-'BB02.1-231-0000066',
-'BB02.1-231-0000067',
-'BB02.1-231-0000130',
-'BB02.1-231-0000131',
-'BB02.1-231-0000187',
-'BB02.1-231-0000188',
-'BB02.1-231-0000353',
-'BB02.1-231-0000354',
-'BB02.1-231-0000407',
-'BB02.1-231-0000408',
-'BB02.1-231-0000409',
-'BB02.1-231-0000410',
