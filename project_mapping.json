@@ -1,0 +1,28 @@
+{
+    "sitrendy": {
+      "build_path": "/var/lib/jenkins/workspace/sitrendy",
+      "ports": { "80/tcp": 1010 },
+      "additional_volumes": { "/var/lib/jenkins/workspace/sitrendy": { "bind": "/var/www/html/app", "mode": "rw" } }
+    },
+    "sitrendy_mobile": {
+      "build_path": "/var/lib/jenkins/workspace/sitrendy",
+      "ports": { "3000/tcp": 1212 },
+      "additional_volumes": {}
+    },
+    "siaappp": {
+      "build_path": "/var/lib/jenkins/workspace/siaappp",
+      "ports": { "80/tcp": 1313 },
+      "additional_volumes": { "/var/lib/jenkins/workspace/siaappp": { "bind": "/var/www/html/app", "mode": "rw" } }
+    },
+    "bib-pendaftaran": {
+      "build_path": "/var/lib/jenkins/workspace/kemenag_lpdp",
+      "ports": { "80/tcp": 1313 },
+      "additional_volumes": { "/var/lib/jenkins/workspace/kemenag_lpdp": { "bind": "/var/www/html/app", "mode": "rw" } }
+    },
+    "bib-keuangan": {
+      "build_path": "/var/lib/jenkins/workspace/lpdp_ongoing",
+      "ports": { "80/tcp": 1313 },
+      "additional_volumes": { "/var/lib/jenkins/workspace/lpdp_ongoing": { "bind": "/var/www/html/app", "mode": "rw" } }
+    }
+  }
+  

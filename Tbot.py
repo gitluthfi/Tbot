@@ -463,23 +463,10 @@ async def on_message(message):
             project_name = message.content.split(" ")[2]
             environment = message.content.split(" ")[3]        
             path_project = '/var/lib/jenkins/workspace/' + project_name
-            project_mapping = {
-            'sitrendy': {
-                'build_path': path_project,
-                'ports': {'80/tcp': 1010},
-                'additional_volumes': {path_project: {'bind': '/var/www/html/app', 'mode': 'rw'}}
-                },
-            'sitrendy_mobile': {
-                'build_path': path_project,
-                'ports': {'3000/tcp': 1212},
-                'additional_volumes': {}
-               },
-            'siaappp': {
-                'build_path': path_project,
-                'ports': {'80/tcp': 1313},
-                'additional_volumes': {path_project: {'bind': '/var/www/html/app', 'mode': 'rw'}}
-                }
-            }
+            
+            with open('project_mapping.json') as f:
+                project_mapping = json.load(f)
+
             if project_name not in project_mapping:
                 await message.reply(f"Sir {message.author.mention} project tidak ditemukan, segera hubungi admin")
                 return
